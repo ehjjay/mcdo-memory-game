@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>McDonald's Memory Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background-color: #fff8e1;
+            color: #ff9800;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 20px;
+            font-size: 2.2em;
+        }
+
+        .timer {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 10px;
+            animation: pulse 1s infinite;
+            color: #ff5722;
+            display: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                color: #ff5722;
+            }
+            50% {
+                transform: scale(1.1);
+                color: #e53935;
+            }
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(4, 100px);
+            gap: 10px;
+            margin: 20px;
+            display: none;
+        }
+
+        .card {
+            width: 100px;
+            height: 100px;
+            background-color: #ffcc80;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2em;
+            color: transparent;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: transform 0.3s;
+        }
+
+        .card.flipped {
+            color: #ff9800;
+            background-color: #fff3e0;
+            transform: scale(1.1);
+        }
+
+        .start-btn, .restart-btn {
+            background-color: #ff9800;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .start-btn:hover, .restart-btn:hover {
+            background-color: #fb8c00;
+        }
+
+        #footer {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #8d6e63;
+        }
+
+        #footer a {
+            color: #ff9800;
+            text-decoration: none;
+        }
+
+        #footer a:hover {
+            text-decoration: underline;
+        }
+
+        #status {
+            font-size: 1.2em;
+            color: #ff5722;
+            margin-top: 10px;
+        }
+
+        /* Pop-up Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.5s;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            color: #ff9800;
+        }
+
+        .modal.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal a {
+            color: #ff5722;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .modal a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>🍔 McDonald's Memory Game 🍟</h1>
+    <p id="timer" class="timer">Time Remaining: 30 seconds</p>
+    <button class="start-btn" onclick="startGame()">Start Game</button>
+    <div class="game-container" id="game-container"></div>
+    <p id="status">Match all pairs to win!</p>
+    <button class="restart-btn" onclick="restartGame()" style="display:none;">Restart Game</button>
+    <div id="footer">
+        <a href="https://mcdomenu.com.ph/mcdonalds-happy-meal-menu/" target="_blank">Powered by McDonald's Happy Meal</a>
+    </div>
+
+    <!-- Modal Pop-up for Win/Lose -->
+    <div class="modal" id="modal">
+        <div class="modal-content" id="modal-content">
+            <!-- Content will be set dynamically -->
+        </div>
+    </div>
+
+    <script>
+        const cardIcons = ['🍔', '🍟', '🍦', '🥤', '🍗', '🍕', '🍩', '🥪'];
+        let cards = [...cardIcons, ...cardIcons]; // Duplicate each icon for matching pairs
+        let firstCard, secondCard;
+        let lockBoard = false;
+        let matchedPairs = 0;
+        let timerInterval;
+        let timeRemaining = 30;
+
+        const gameContainer = document.getElementById('game-container');
+        const statusText = document.getElementById('status');
+        const timerText = document.getElementById('timer');
+        const startButton = document.querySelector('.start-btn');
+        const restartButton = document.querySelector('.restart-btn');
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+        const linkURL = "https://mcdomenu.com.ph/mcdonalds-happy-meal-menu/";
+
+        function shuffle(array) {
+            return array.sort(() => Math.random() - 0.5);
+        }
+
+        function createBoard() {
+            gameContainer.innerHTML = '';
+            matchedPairs = 0;
+            lockBoard = false;
+            cards = shuffle(cards);
+            cards.forEach(icon => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.icon = icon;
+                card.addEventListener('click', flipCard);
+                gameContainer.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+            if (lockBoard || this === firstCard) return;
+            this.classList.add('flipped');
+            this.textContent = this.dataset.icon;
+
+            if (!firstCard) {
+                firstCard = this;
+            } else {
+                secondCard = this;
+                lockBoard = true;
+                checkForMatch();
+            }
+        }
+
+        function checkForMatch() {
+            if (firstCard.dataset.icon === secondCard.dataset.icon) {
+                disableCards();
+                matchedPairs++;
+                if (matchedPairs === cardIcons.length) {
+                    clearInterval(timerInterval);
+                    showModal(`🎉 <a href="${linkURL}" target="_blank">Congratulations! Celebrate with Happy Meal 🎉</a>`);
+                }
+            } else {
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            firstCard.removeEventListener('click', flipCard);
+            secondCard.removeEventListener('click', flipCard);
+            resetBoard();
+        }
+
+        function unflipCards() {
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                firstCard.textContent = '';
+                secondCard.textContent = '';
+                resetBoard();
+            }, 500);
+        }
+
+        function resetBoard() {
+            [firstCard, secondCard, lockBoard] = [null, null, false];
+        }
+
+        function startTimer() {
+            timeRemaining = 30;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                timerText.textContent = `Time Remaining: ${timeRemaining} seconds`;
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    lockBoard = true; // Prevent further moves
+                    showModal(`⏳ <a href="${linkURL}" target="_blank">Need more Energy, Order Happy Meal!</a>`);
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            startButton.style.display = 'none';
+            gameContainer.style.display = 'grid';
+            timerText.style.display = 'block';
+            restartButton.style.display = 'inline-block';
+            statusText.textContent = "Match all pairs to win!";
+            createBoard();
+            startTimer();
+        }
+
+        function restartGame() {
+            modal.classList.remove('show');
+            statusText.textContent = "Match all pairs to win!";
+            timerText.textContent = `Time Remaining: 30 seconds`;
+            createBoard();
+            startTimer();
+        }
+
+        function showModal(message) {
+            modalContent.innerHTML = message;
+            modal.classList.add('show');
+        }
+    </script>
+</body>
+</html>
